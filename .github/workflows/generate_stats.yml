@@ -1,0 +1,60 @@
+name: Update GitHub Stats SVG
+
+on:
+  schedule:
+    - cron: '0 * * * *'  
+  workflow_dispatch:        
+
+permissions:
+  contents: write           
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0      
+
+      - name: Create output directory
+        run: mkdir -p img
+
+      - name: Generate GitHub stats SVG
+        run: |
+          curl "${ENDPOINT}/api?username=ktkrhr&show_icons=true&locale=en" > img/stats.svg
+          curl "${ENDPOINT}/api/top-langs/?username=ktkrhr&locale=en&size_wight=0.5&count_weight=0.5&langs_count=8&layout=compact" > img/lang-stats.svg
+        env:
+          ENDPOINT: ${{ secrets.README_STATS_ENDPOINT }}
+
+      - name: Setup Git identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Switch to the main branch
+        run: |
+          git fetch origin main
+          git checkout main
+          git pull origin main
+
+      - name: Indexing and adding SVG
+        run: |
+          git add img/*.svg
+
+      - name: Commit and push updated SVG
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            git commit -m "Update GitHub stats SVG manually" --allow-empty
+            git push origin main
+          else
+            if git diff --cached --quiet; then
+              echo "No changes found, commit skipped."
+            else
+              git commit -m "Update GitHub stats SVG"
+              git push origin main
+            fi
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
